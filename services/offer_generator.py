@@ -1,5 +1,5 @@
 # services/offer_generator.py
-from services.llm_client import get_client
+from .llm_client import get_client
 from config import settings
 
 def generate_offer_letter(inputs: dict) -> str:

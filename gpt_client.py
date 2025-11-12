@@ -1,6 +1,8 @@
 # gpt_client.py
 import os
 from openai import OpenAI
+import sys,pathlib
+sys.path.append(str(pathlib.Path(__file__).parent.resolve))
 
 # Try to load .env locally; ignore on Cloud if package not present
 # try:

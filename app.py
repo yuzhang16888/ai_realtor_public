@@ -224,28 +224,33 @@ with st.expander("🔐 Log in", expanded=True if st.session_state.get("user") is
 with st.expander("🧾 Generate Offer Letter (stub)", expanded=True):
     if require_login():
         st.write("Enter basic details — still offline, no GPT yet.")
-        with st.form("offer_stub_form"):
+
+        # 1) Start the form (everything indented under here is part of the form)
+        with st.form("offer_stub_form", clear_on_submit=False):
             addr = st.text_input("Property address", "850 Minnesota St #M101, San Francisco, CA")
-            price = st.number_input("Offer price ($)", 500000, 5000000, 1200000, step=50000)
+            price = st.number_input("Offer price ($)", min_value=500000, max_value=5000000, value=1200000, step=50000)
+            earnest = st.number_input("Earnest money ($)", min_value=1000, max_value=500000, value=int(price * 0.03), step=1000)
             buyer = st.text_input("Buyer name", "Jane Doe")
-            close_days = st.slider("Closing in (days)", 10, 60, 30)
-            earnest_money=st.number_input("Earnest money ($)",1000,50000,int(price *0.03),stpe=1000)
+            close_days = st.slider("Closing in (days)", min_value=10, max_value=60, value=30)
             financing = st.selectbox("Financing type", ["Conventional", "All cash", "FHA", "VA", "Other"])
             contingencies = st.multiselect(
                 "Contingencies",
                 ["Inspection", "Appraisal", "Loan", "Sale of current home"],
-                ["Inspection", "Appraisal"],
+                default=["Inspection", "Appraisal"],
             )
             notes = st.text_area("Additional notes", "We love the light and Dogpatch location.")
+
+            # 2) Submit button MUST be inside the form block
             submitted = st.form_submit_button("Generate letter")
 
+        # 3) Handle submit OUTSIDE the form block (one indent less)
         if submitted:
             inputs = {
                 "property_address": addr,
                 "offer_price": price,
+                "earnest": earnest,
                 "buyer_name": buyer,
                 "close_days": close_days,
-                "earnest_money":earnest_money,
                 "financing": financing,
                 "contingencies": contingencies,
                 "notes": notes,

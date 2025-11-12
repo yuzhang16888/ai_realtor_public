@@ -40,3 +40,32 @@ Additional notes:
 Sincerely,
 {buyer}
 """
+with st.expander("🧾 Generate Offer Letter (stub)", expanded=True):
+    st.write("Enter basic details — still offline, no GPT yet.")
+    with st.form("offer_stub_form"):
+        addr = st.text_input("Property address", "850 Minnesota St #M101, San Francisco, CA")
+        price = st.number_input("Offer price ($)", 500000, 5000000, 1200000, step=50000)
+        buyer = st.text_input("Buyer name", "Jane Doe")
+        close_days = st.slider("Closing in (days)", 10, 60, 30)
+        financing = st.selectbox("Financing type", ["Conventional", "All cash", "FHA", "VA", "Other"])
+        contingencies = st.multiselect(
+            "Contingencies",
+            ["Inspection", "Appraisal", "Loan", "Sale of current home"],
+            ["Inspection", "Appraisal"],
+        )
+        notes = st.text_area("Additional notes", "We love the light and Dogpatch location.")
+        submitted = st.form_submit_button("Generate letter")
+
+    if submitted:
+        inputs = {
+            "property_address": addr,
+            "offer_price": price,
+            "buyer_name": buyer,
+            "close_days": close_days,
+            "financing": financing,
+            "contingencies": contingencies,
+            "notes": notes,
+        }
+        letter = generate_offer_letter_stub(inputs)
+        st.code(letter)
+        st.download_button("Download letter (txt)", letter, "offer_letter.txt")

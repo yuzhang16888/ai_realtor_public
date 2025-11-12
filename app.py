@@ -38,7 +38,13 @@ with st.sidebar:
     if st.button("🔄 Reload knowledge"):
         st.session_state.kb_seed += 1
         st.cache_data.clear()
-        st.experimental_rerun()
+        # works in all Streamlit versions
+        try:
+            st.rerun()
+        except AttributeError:
+            st.experimental_rerun()
+
+
 
 st.caption(f"📚 KB loaded: {len(files)} file(s). Click 'Reload knowledge' after editing kb/*.md.")
 

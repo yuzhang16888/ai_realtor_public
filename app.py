@@ -13,14 +13,13 @@ import streamlit as st
 from gpt_client import chat, SYSTEM_PROMPT_BASE
 from kb import load_notes  # must read all kb/*.md or kb/*.txt
 
-from components.filters import render_filters
-
-from components.results import render_hits
-from components.chat import render_chat
-from components.offer_form import render_offer_form
-from services.search_client import fast_search
-from services.cache import cache_data
-from services.offer_generator import generate_offer_letter
+# from components.filters import render_filters
+# from components.results import render_hits
+# from components.chat import render_chat
+# from components.offer_form import render_offer_form
+# from services.search_client import fast_search
+# from services.cache import cache_data
+# from services.offer_generator import generate_offer_letter
 
 # -----------------------------------------------
 # 🏠 PAGE SETUP
@@ -155,23 +154,23 @@ if user_q:
 
 
 
-from components.offer_form import render_offer_form
-from services.offer_generator import generate_offer_letter
+# from components.offer_form import render_offer_form
+# from services.offer_generator import generate_offer_letter
 
-st.sidebar.markdown("---")
-mode = st.sidebar.radio("Mode", ["Search", "Offer Generator"], index=0)
+# st.sidebar.markdown("---")
+# mode = st.sidebar.radio("Mode", ["Search", "Offer Generator"], index=0)
 
-if mode == "Offer Generator":
-    offer_inputs = render_offer_form()
-    if offer_inputs:
-        with st.spinner("Generating offer letter..."):
-            letter = generate_offer_letter(offer_inputs)
-        st.subheader("📄 Offer Letter Draft")
-        st.markdown(letter)
-        st.download_button("Download Offer Letter (txt)", letter, file_name="offer_letter.txt")
-else:
-    # existing search/chat UI
-    ...
+# if mode == "Offer Generator":
+#     offer_inputs = render_offer_form()
+#     if offer_inputs:
+#         with st.spinner("Generating offer letter..."):
+#             letter = generate_offer_letter(offer_inputs)
+#         st.subheader("📄 Offer Letter Draft")
+#         st.markdown(letter)
+#         st.download_button("Download Offer Letter (txt)", letter, file_name="offer_letter.txt")
+# else:
+#     # existing search/chat UI
+#     ...
 
 
 # -----------------------------------------------

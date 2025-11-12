@@ -27,6 +27,11 @@ except Exception:
     fast_search = None
 # If you used components.* previously, you can re-import them later once repo is stable.
 
+from services.evals import init_eval_db
+init_db()
+init_eval_db()
+
+
 # ------------------------------
 # App setup
 # ------------------------------

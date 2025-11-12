@@ -31,6 +31,7 @@ from services.evals import init_eval_db
 init_db()
 init_eval_db()
 
+from services.evals import create_property_eval,save_uploads,list_property_evals
 
 # ------------------------------
 # App setup
@@ -152,9 +153,7 @@ if user and st.session_state["auth_view"] == "profile":
             else:
                 st.error(res["error"] or "Could not update profile.")
 
-# ------------------------------
-# Buyer Profile – stage 1 (collect intent + basics)
-# ------------------------------
+
 # ------------------------------
 # Buyer Profile – stage 1 (intent-conditional UI)
 # ------------------------------
@@ -189,34 +188,97 @@ if user and st.session_state["auth_view"] == "profile":
 
     if intent == "Evaluating a specific property":
         # Hide budget/city. Show property address fields instead.
-        st.subheader("📍 Property to evaluate")
-        sp = profile.get("subject_property", {}) or {}
+        st.subheader("🧰 What help do you need for this property?")
 
-        sp["address1"] = st.text_input("Address line 1", sp.get("address1", ""))
-        sp["address2"] = st.text_input("Address line 2 (unit/suite/floor, optional)", sp.get("address2", ""))
-        sp["prop_city"] = st.text_input(
-            "City",
-            sp.get("prop_city", profile.get("city", "San Francisco")),
-        )
-        sp["zipcode"] = st.text_input("ZIP code", sp.get("zipcode", ""))
-
-        profile["subject_property"] = sp
-
-    else:
-        # Exploring path: show budget + preferred city
-        profile["budget_min"], profile["budget_max"] = st.slider(
-            "Budget range ($)", 300000, 5000000,
-            (profile.get("budget_min", 800000), profile.get("budget_max", 1200000)),
-            step=50000,
-        )
-        profile["city"] = st.text_input(
-            "Preferred city or neighborhood",
-            value=profile.get("city", "San Francisco"),
+        # A) Price suggestion toggle → show contingencies if yes
+        want_price = st.radio(
+            "Are you looking for a price suggestion / offer advice?",
+            ["No", "Yes"],
+            horizontal=True,
+            key="eval_want_price",
         )
 
-    # persist to session
-    st.session_state["buyer_profile"] = profile
-    st.success("Preferences saved in session (not DB yet).")
+        contingencies = []
+        if want_price == "Yes":
+            contingencies = st.multiselect(
+                "If so, which contingencies might you waive?",
+                ["Inspection", "Appraisal", "Loan", "Sale of current home"],
+                default=[],
+                key="eval_contingencies",
+            )
+
+        # B) Buy / Not buy reasoning
+        want_buy_advice = st.radio(
+            "Are you looking for a buy/not-buy suggestion (e.g., location, litigation, building condition)?",
+            ["No", "Yes"],
+            horizontal=True,
+            key="eval_want_buy_advice",
+        )
+
+        concerns = ""
+        if want_buy_advice == "Yes":
+            concerns = st.text_area(
+                "Tell us your concerns (optional)",
+                placeholder="e.g., HOA lawsuit? soft-story retrofit? street noise? shadow impact?",
+                key="eval_concerns",
+            )
+
+        # C) Upload disclosures / docs (optional)
+        uploads = st.file_uploader(
+            "If you have disclosures from the seller agent, upload them here (PDFs recommended).",
+            type=["pdf", "jpg", "png"],
+            accept_multiple_files=True,
+            key="eval_uploads",
+        )
+
+        # D) Save request
+        if st.button("💾 Save Evaluation Request", type="primary"):
+            # Build payload to store
+            payload = {
+                "mode": "evaluating_specific_property",
+                "subject_property": {
+                    "address1": sp["address1"],
+                    "address2": sp.get("address2", ""),
+                    "city": sp.get("prop_city", ""),
+                    "zipcode": sp.get("zipcode", ""),
+                },
+                "asks": {
+                    "want_price": (want_price == "Yes"),
+                    "contingencies": contingencies,
+                    "want_buy_advice": (want_buy_advice == "Yes"),
+                    "concerns": concerns,
+                },
+            }
+
+            saved_paths = save_uploads(uploads) if uploads else []
+            out = create_property_eval(user_id=user["id"], payload=payload, uploaded_paths=saved_paths)
+            if out["ok"]:
+                st.success(
+                    "We’re on it! Your evaluation request was saved. If you shared disclosures, that helps us a ton. "
+                    "You’ll receive our recommendations within 24 hours."
+                )
+            else:
+                st.error(f"Could not save request: {out['error']}")
+st.divider()
+st.markdown("#### 🗂️ Your Property Evaluations")
+evals = list_property_evals(user_id=user["id"], limit=10)
+if not evals:
+    st.caption("No saved evaluations yet.")
+else:
+    for e in evals:
+        with st.container(border=True):
+            st.write(f"**Request #{e['id']}** — status: `{e['status']}` — created: {e['created_at']}")
+            sp_payload = e["payload"].get("subject_property", {})
+            st.write(
+                f"**Property:** {sp_payload.get('address1','')} {sp_payload.get('address2','')}, "
+                f"{sp_payload.get('city','')} {sp_payload.get('zipcode','')}"
+            )
+            asks = e["payload"].get("asks", {})
+            if asks.get("want_price"):
+                st.write(f"• Price suggestion requested — contingencies: {', '.join(asks.get('contingencies', [])) or 'none'}")
+            if asks.get("want_buy_advice"):
+                st.write(f"• Buy/Not-buy advice — concerns: {asks.get('concerns') or '—'}")
+
 
 # if user and st.session_state["auth_view"] == "profile":
 #     st.markdown("### 🏡 Buyer Profile")

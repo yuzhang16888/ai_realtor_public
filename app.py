@@ -14,9 +14,7 @@ from gpt_client import chat, SYSTEM_PROMPT_BASE
 from kb import load_notes  # must read all kb/*.md or kb/*.txt
 from services.offer_generator import generate_offer_letter_stub
 from services.auth import init_db
-
-
-
+from services.auth import verify_credentials, get_user_by_email
 
 
 # -----------------------------------------------
@@ -30,6 +28,18 @@ init_db()
 # code check
 import os, streamlit as st
 st.caption(f"Auth DB: {os.path.abspath('data/users.db')}")
+
+
+# -----------------------------------------------
+# 🏠 Gate Features require login
+# -----------------------------------------------
+def require_login() -> bool:
+    """Return True if a user is logged in; otherwise show a notice and return False."""
+    if st.session_state.get("user"):
+        return True
+    st.info("Please **log in** to use this feature.")
+    return False
+
 
 # -----------------------------------------------
 # 📚 KNOWLEDGE BASE LOADER (with reload)
@@ -155,9 +165,9 @@ if user_q:
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
-####################################
-# user sign in   ###################
-####################################
+#----------------------------------------------
+# user sign up  
+#-----------------------------------------------
 from services.auth import create_user  # add with your imports
 
 with st.expander("👤 Create an account (Sign Up)", expanded=True):
@@ -179,37 +189,71 @@ with st.expander("👤 Create an account (Sign Up)", expanded=True):
                 st.success("Account created! You can log in now.")
             else:
                 st.error(res["error"] or "Could not create account.")
+#--------------------------------------
+#----user log in
+#--------------------------------------
+with st.expander("🔐 Log in", expanded=True if st.session_state.get("user") is None else False):
+    if st.session_state.get("user"):
+        st.success(f"Logged in as {st.session_state['user']['email']}")
+        if st.button("Log out"):
+            st.session_state["user"] = None
+            st.rerun()
+    else:
+        with st.form("login_form", clear_on_submit=False):
+            li_email = st.text_input("Email", placeholder="you@example.com")
+            li_pw = st.text_input("Password", type="password")
+            li_submit = st.form_submit_button("Log in")
 
+        if li_submit:
+            res = verify_credentials(li_email, li_pw)
+            if res["ok"] and res["user"]:
+                user = res["user"]
+                # store only safe fields in session
+                st.session_state["user"] = {"id": user.id, "email": user.email, "name": user.name}
+                st.success("Logged in successfully.")
+                st.rerun()
+            else:
+                st.error(res["error"] or "Login failed.")
+
+
+
+#------------------------------
+#- offer letter generator
+#--------------------------------------
 
 with st.expander("🧾 Generate Offer Letter (stub)", expanded=True):
-    st.write("Enter basic details — still offline, no GPT yet.")
-    with st.form("offer_stub_form"):
-        addr = st.text_input("Property address", "850 Minnesota St #M101, San Francisco, CA")
-        price = st.number_input("Offer price ($)", 500000, 5000000, 1200000, step=50000)
-        buyer = st.text_input("Buyer name", "Jane Doe")
-        close_days = st.slider("Closing in (days)", 10, 60, 30)
-        financing = st.selectbox("Financing type", ["Conventional", "All cash", "FHA", "VA", "Other"])
-        contingencies = st.multiselect(
-            "Contingencies",
-            ["Inspection", "Appraisal", "Loan", "Sale of current home"],
-            ["Inspection", "Appraisal"],
-        )
-        notes = st.text_area("Additional notes", "We love the light and Dogpatch location.")
-        submitted = st.form_submit_button("Generate letter")
+    if require_login():
+        st.write("Enter basic details — still offline, no GPT yet.")
+        with st.form("offer_stub_form"):
+            addr = st.text_input("Property address", "850 Minnesota St #M101, San Francisco, CA")
+            price = st.number_input("Offer price ($)", 500000, 5000000, 1200000, step=50000)
+            buyer = st.text_input("Buyer name", "Jane Doe")
+            close_days = st.slider("Closing in (days)", 10, 60, 30)
+            earnest_money=st.number_input("Earnest money ($)",1000,50000,int(price *0.03),stpe=1000)
+            financing = st.selectbox("Financing type", ["Conventional", "All cash", "FHA", "VA", "Other"])
+            contingencies = st.multiselect(
+                "Contingencies",
+                ["Inspection", "Appraisal", "Loan", "Sale of current home"],
+                ["Inspection", "Appraisal"],
+            )
+            notes = st.text_area("Additional notes", "We love the light and Dogpatch location.")
+            submitted = st.form_submit_button("Generate letter")
 
-    if submitted:
-        inputs = {
-            "property_address": addr,
-            "offer_price": price,
-            "buyer_name": buyer,
-            "close_days": close_days,
-            "financing": financing,
-            "contingencies": contingencies,
-            "notes": notes,
-        }
-        letter = generate_offer_letter_stub(inputs)
-        st.code(letter)
-        st.download_button("Download letter (txt)", letter, "offer_letter.txt")
+        if submitted:
+            inputs = {
+                "property_address": addr,
+                "offer_price": price,
+                "buyer_name": buyer,
+                "close_days": close_days,
+                "earnest_money":earnest_money,
+                "financing": financing,
+                "contingencies": contingencies,
+                "notes": notes,
+            }
+            letter = generate_offer_letter_stub(inputs)
+            st.code(letter)
+            st.download_button("Download letter (txt)", letter, "offer_letter.txt")
+        
 
 
 

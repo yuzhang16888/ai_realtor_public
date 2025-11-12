@@ -136,6 +136,27 @@ if user_q:
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
+
+
+from components.offer_form import render_offer_form
+from services.offer_generator import generate_offer_letter
+
+st.sidebar.markdown("---")
+mode = st.sidebar.radio("Mode", ["Search", "Offer Generator"], index=0)
+
+if mode == "Offer Generator":
+    offer_inputs = render_offer_form()
+    if offer_inputs:
+        with st.spinner("Generating offer letter..."):
+            letter = generate_offer_letter(offer_inputs)
+        st.subheader("📄 Offer Letter Draft")
+        st.markdown(letter)
+        st.download_button("Download Offer Letter (txt)", letter, file_name="offer_letter.txt")
+else:
+    # existing search/chat UI
+    ...
+
+
 # -----------------------------------------------
 # 🪪 FOOTER
 # -----------------------------------------------

@@ -8,6 +8,7 @@ if str(BASE_DIR) not in sys.path:
 
 import os
 import streamlit as st
+from services.auth import update_user_name,get_user_by_id
 
 # --- services (hard requirements) ---
 from services.auth import init_db, create_user, verify_credentials
@@ -123,13 +124,28 @@ if not user and st.session_state["auth_view"] == "login":
                 st.error(res["error"] or "Login failed.")
 
 # ------------------------------
+# ------------------------------
 # Profile (only when logged in)
 # ------------------------------
+user = st.session_state.get("user")
 if user and st.session_state["auth_view"] == "profile":
     with st.expander("👤 Profile", expanded=True):
         st.write(f"**Email:** {user['email']}")
-        st.write(f"**Name:** {user.get('name') or '—'}")
-        st.caption("Profile editing coming next step.")
+
+        with st.form("profile_form", clear_on_submit=False):
+            new_name = st.text_input("Full name", value=user.get("name") or "")
+            save_profile = st.form_submit_button("Save")
+
+        if save_profile:
+            res = update_user_name(user_id=user["id"], name=new_name or None)
+            if res["ok"]:
+                # refresh session copy
+                refreshed = get_user_by_id(user["id"])
+                st.session_state["user"] = {"id": refreshed.id, "email": refreshed.email, "name": refreshed.name}
+                st.success("Profile updated.")
+            else:
+                st.error(res["error"] or "Could not update profile.")
+
 
 # ------------------------------
 # Offer letter generator (stub) — gated by login

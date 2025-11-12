@@ -78,3 +78,21 @@ def verify_credentials(email: str, password: str) -> Dict[str, Any]:
     if _check_password(password, row[3]):
         return {"ok": True, "user": user, "error": None}
     return {"ok": False, "user": None, "error": "Incorrect password"}
+
+# get user by id
+def get_user_by_id(user_id:int)->Optional[User]:
+    with _conn()as cx:
+        row=cs.execute("SELECT id, email, name FROM users WHERE id = ?", (user_id,)).fetchone())
+    if not row:
+        return None
+    return User(id=row[0],email=row[1],name=row[2])
+# get user name
+def update_user_name(user_id: int, name: Optional[str]) -> Dict[str, Any]:
+    try:
+        with _conn() as cx:
+            cx.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+            cx.commit()
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+

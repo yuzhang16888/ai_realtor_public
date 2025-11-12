@@ -1,7 +1,12 @@
 # app.py
 # app.py (very top)
+# app.py (top)
 import sys, pathlib
-sys.path.append(str(pathlib.Path(__file__).parent.resolve()))
+BASE_DIR = pathlib.Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+# sys.path.append(str(pathlib.Path(__file__).parent.resolve()))
 import os
 import glob
 import streamlit as st
@@ -9,6 +14,7 @@ from gpt_client import chat, SYSTEM_PROMPT_BASE
 from kb import load_notes  # must read all kb/*.md or kb/*.txt
 
 from components.filters import render_filters
+
 from components.results import render_hits
 from components.chat import render_chat
 from components.offer_form import render_offer_form

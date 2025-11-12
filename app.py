@@ -232,23 +232,25 @@ if user and st.session_state["auth_view"] == "profile":
         )
 
         # D) Save request
+        # make sure we have the subject property dict in-scope here
+        subject = profile.get("subject_property", {}) or {}
         if st.button("💾 Save Evaluation Request", type="primary"):
             # Build payload to store
             payload = {
-                "mode": "evaluating_specific_property",
-                "subject_property": {
-                    "address1": sp["address1"],
-                    "address2": sp.get("address2", ""),
-                    "city": sp.get("prop_city", ""),
-                    "zipcode": sp.get("zipcode", ""),
-                },
-                "asks": {
-                    "want_price": (want_price == "Yes"),
-                    "contingencies": contingencies,
-                    "want_buy_advice": (want_buy_advice == "Yes"),
-                    "concerns": concerns,
-                },
-            }
+            "mode": "evaluating_specific_property",
+            "subject_property": {
+            "address1": subject.get("address1", ""),
+            "address2": subject.get("address2", ""),
+            "city":    subject.get("prop_city", ""),
+            "zipcode": subject.get("zipcode", ""),
+        },
+         "asks": {
+             "want_price": (want_price == "Yes"),
+             "contingencies": contingencies,
+             "want_buy_advice": (want_buy_advice == "Yes"),
+             "concerns": concerns,
+    },
+}
 
             saved_paths = save_uploads(uploads) if uploads else []
             out = create_property_eval(user_id=user["id"], payload=payload, uploaded_paths=saved_paths)

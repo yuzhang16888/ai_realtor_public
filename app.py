@@ -150,46 +150,109 @@ if user and st.session_state["auth_view"] == "profile":
 # ------------------------------
 # Buyer Profile – stage 1 (collect intent + basics)
 # ------------------------------
+# ------------------------------
+# Buyer Profile – stage 1 (intent-conditional UI)
+# ------------------------------
 if user and st.session_state["auth_view"] == "profile":
     st.markdown("### 🏡 Buyer Profile")
 
-    # initialize session slot
+    # initialize once
     if "buyer_profile" not in st.session_state:
         st.session_state["buyer_profile"] = {
-            "intent": None,
+            "intent": "Just exploring the market",
             "budget_min": 800000,
             "budget_max": 1200000,
             "city": "San Francisco",
+            "subject_property": {  # only used when evaluating a specific property
+                "address1": "",
+                "address2": "",
+                "prop_city": "",
+                "zipcode": "",
+            },
         }
 
     profile = st.session_state["buyer_profile"]
 
-    # 1️⃣ intent
-    profile["intent"] = st.radio(
+    # 1) intent
+    intent = st.radio(
         "What brings you here today?",
         ["Just exploring the market", "Evaluating a specific property"],
-        index=0 if not profile["intent"] else
-        (0 if profile["intent"] == "Just exploring the market" else 1),
+        index=0 if profile.get("intent") != "Evaluating a specific property" else 1,
         horizontal=True,
     )
+    profile["intent"] = intent
 
-    # 2️⃣ budget range
-    profile["budget_min"], profile["budget_max"] = st.slider(
-        "Budget range ($)", 300000, 5000000,
-        (profile["budget_min"], profile["budget_max"]),
-        step=50000,
-    )
+    if intent == "Evaluating a specific property":
+        # Hide budget/city. Show property address fields instead.
+        st.subheader("📍 Property to evaluate")
+        sp = profile.get("subject_property", {}) or {}
 
-    # 3️⃣ city / neighborhood
-    profile["city"] = st.text_input(
-        "Preferred city or neighborhood",
-        value=profile.get("city", "San Francisco"),
-    )
+        sp["address1"] = st.text_input("Address line 1", sp.get("address1", ""))
+        sp["address2"] = st.text_input("Address line 2 (unit/suite/floor, optional)", sp.get("address2", ""))
+        sp["prop_city"] = st.text_input(
+            "City",
+            sp.get("prop_city", profile.get("city", "San Francisco")),
+        )
+        sp["zipcode"] = st.text_input("ZIP code", sp.get("zipcode", ""))
 
-    # Save in session
+        profile["subject_property"] = sp
+
+    else:
+        # Exploring path: show budget + preferred city
+        profile["budget_min"], profile["budget_max"] = st.slider(
+            "Budget range ($)", 300000, 5000000,
+            (profile.get("budget_min", 800000), profile.get("budget_max", 1200000)),
+            step=50000,
+        )
+        profile["city"] = st.text_input(
+            "Preferred city or neighborhood",
+            value=profile.get("city", "San Francisco"),
+        )
+
+    # persist to session
     st.session_state["buyer_profile"] = profile
-
     st.success("Preferences saved in session (not DB yet).")
+
+# if user and st.session_state["auth_view"] == "profile":
+#     st.markdown("### 🏡 Buyer Profile")
+
+#     # initialize session slot
+#     if "buyer_profile" not in st.session_state:
+#         st.session_state["buyer_profile"] = {
+#             "intent": None,
+#             "budget_min": 800000,
+#             "budget_max": 1200000,
+#             "city": "San Francisco",
+#         }
+
+#     profile = st.session_state["buyer_profile"]
+
+#     # 1️⃣ intent
+#     profile["intent"] = st.radio(
+#         "What brings you here today?",
+#         ["Just exploring the market", "Evaluating a specific property"],
+#         index=0 if not profile["intent"] else
+#         (0 if profile["intent"] == "Just exploring the market" else 1),
+#         horizontal=True,
+#     )
+
+#     # 2️⃣ budget range
+#     profile["budget_min"], profile["budget_max"] = st.slider(
+#         "Budget range ($)", 300000, 5000000,
+#         (profile["budget_min"], profile["budget_max"]),
+#         step=50000,
+#     )
+
+#     # 3️⃣ city / neighborhood
+#     profile["city"] = st.text_input(
+#         "Preferred city or neighborhood",
+#         value=profile.get("city", "San Francisco"),
+#     )
+
+#     # Save in session
+#     st.session_state["buyer_profile"] = profile
+
+#     st.success("Preferences saved in session (not DB yet).")
 
 # ------------------------------
 # Offer letter generator (stub) — gated by login

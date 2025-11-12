@@ -8,6 +8,7 @@ if str(BASE_DIR) not in sys.path:
 
 import os
 import streamlit as st
+
 from services.auth import update_user_name,get_user_by_id
 
 # --- services (hard requirements) ---
@@ -146,6 +147,49 @@ if user and st.session_state["auth_view"] == "profile":
             else:
                 st.error(res["error"] or "Could not update profile.")
 
+# ------------------------------
+# Buyer Profile – stage 1 (collect intent + basics)
+# ------------------------------
+if user and st.session_state["auth_view"] == "profile":
+    st.markdown("### 🏡 Buyer Profile")
+
+    # initialize session slot
+    if "buyer_profile" not in st.session_state:
+        st.session_state["buyer_profile"] = {
+            "intent": None,
+            "budget_min": 800000,
+            "budget_max": 1200000,
+            "city": "San Francisco",
+        }
+
+    profile = st.session_state["buyer_profile"]
+
+    # 1️⃣ intent
+    profile["intent"] = st.radio(
+        "What brings you here today?",
+        ["Just exploring the market", "Evaluating a specific property"],
+        index=0 if not profile["intent"] else
+        (0 if profile["intent"] == "Just exploring the market" else 1),
+        horizontal=True,
+    )
+
+    # 2️⃣ budget range
+    profile["budget_min"], profile["budget_max"] = st.slider(
+        "Budget range ($)", 300000, 5000000,
+        (profile["budget_min"], profile["budget_max"]),
+        step=50000,
+    )
+
+    # 3️⃣ city / neighborhood
+    profile["city"] = st.text_input(
+        "Preferred city or neighborhood",
+        value=profile.get("city", "San Francisco"),
+    )
+
+    # Save in session
+    st.session_state["buyer_profile"] = profile
+
+    st.success("Preferences saved in session (not DB yet).")
 
 # ------------------------------
 # Offer letter generator (stub) — gated by login

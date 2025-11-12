@@ -1,269 +1,181 @@
-# app.py
-# app.py (very top)
-# app.py (top)
+# app.py — clean, working scaffold with auth + gated offer stub
+
+# --- make local packages importable regardless of working dir ---
 import sys, pathlib
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-# sys.path.append(str(pathlib.Path(__file__).parent.resolve()))
 import os
-import glob
 import streamlit as st
-from gpt_client import chat, SYSTEM_PROMPT_BASE
-from kb import load_notes  # must read all kb/*.md or kb/*.txt
-from services.offer_generator import generate_offer_letter_stub
-from services.auth import init_db
-from services.auth import verify_credentials, get_user_by_email
 
+# --- services (hard requirements) ---
+from services.auth import init_db, create_user, verify_credentials
 
-# -----------------------------------------------
-# 🏠 PAGE SETUP
-# -----------------------------------------------
-st.set_page_config(page_title="🏡 AI Realtor", page_icon="🏠", layout="centered")
-st.title("🏡 AI Realtor")
-st.caption("Ask anything about SF home buying. The agent uses your private notes for context. (Demo; not legal/financial advice.)")
+# --- optional services (best-effort to avoid hard crashes) ---
+try:
+    from services.offer_generator import generate_offer_letter_stub
+except Exception:
+    generate_offer_letter_stub = None
+
+# (optional search bits; keep best-effort)
+try:
+    from services.search_client import fast_search
+except Exception:
+    fast_search = None
+# If you used components.* previously, you can re-import them later once repo is stable.
+
+# ------------------------------
+# App setup
+# ------------------------------
+st.set_page_config(page_title="AI Realtor", layout="wide")
+st.title("🏠 AI Realtor — Phase 2")
+
+# init auth DB
 init_db()
 
-# code check
-import os, streamlit as st
-st.caption(f"Auth DB: {os.path.abspath('data/users.db')}")
+# session defaults
+if "user" not in st.session_state:
+    st.session_state["user"] = None
+if "auth_view" not in st.session_state:
+    # options: "welcome", "login", "signup", "visitor", "profile"
+    st.session_state["auth_view"] = "welcome"
 
-
-# -----------------------------------------------
-# 🏠 Gate Features require login
-# -----------------------------------------------
+# ------------------------------
+# helper: require login
+# ------------------------------
 def require_login() -> bool:
-    """Return True if a user is logged in; otherwise show a notice and return False."""
     if st.session_state.get("user"):
         return True
     st.info("Please **log in** to use this feature.")
     return False
 
+# ------------------------------
+# Welcome chooser
+# ------------------------------
+user = st.session_state.get("user")
 
-# -----------------------------------------------
-# 📚 KNOWLEDGE BASE LOADER (with reload)
-# -----------------------------------------------
-with st.sidebar:
-    st.subheader("🔎 Find Listings (MVP)")
-
-    # remember last filters
-    ss = st.session_state
-    def _g(key, default): 
-        if key not in ss: ss[key] = default
-        return ss[key]
-
-    neighborhood = st.text_input("Neighborhood / Area", value=_g("nbhd","Dogpatch, San Francisco, CA"))
-    prop_type    = st.selectbox("Property type", ["Condo", "Townhouse", "Single Family"], index=_g("ptype_i",0))
-    min_price    = st.number_input("Min price", min_value=0, step=50000, value=_g("pmin",800000))
-    max_price    = st.number_input("Max price", min_value=0, step=50000, value=_g("pmax",1500000))
-    beds         = st.selectbox("Beds (min)", ["Any", 1, 2, 3], index=_g("beds_i",1))
-    baths        = st.selectbox("Baths (min)", ["Any", 1, 2], index=_g("baths_i",0))
-
-    # persist choices
-    ss.nbhd = neighborhood
-    ss.ptype_i = ["Condo","Townhouse","Single Family"].index(prop_type)
-    ss.pmin = int(min_price); ss.pmax = int(max_price)
-    ss.beds_i = ["Any",1,2,3].index(beds); ss.baths_i = ["Any",1,2].index(baths)
-
-    def q(v): 
-        return "" if v in (None, "Any") else str(v)
-
-    # build links only when user clicks "Search"
-    do_search = st.button("🔍 Search")
-
-    if do_search:
-        # —— Zillow direct-ish path ——
-        z_area = neighborhood.lower().replace(",", "").replace(" ", "-")
-        z_base = f"https://www.zillow.com/{z_area}/"
-        if prop_type.lower() == "condo":
-            z_base += "condos/"
-
-        # Google helpers (robust if portals change URL params)
-        z_google = (
-            "https://www.google.com/search?q=" +
-            "+".join([
-                "site:zillow.com",
-                neighborhood.replace(" ", "+"),
-                "condos" if prop_type.lower() == "condo" else prop_type.lower(),
-                f"${min_price}-{max_price}",
-                (f"{beds}+bed" if q(beds) else ""),
-                (f"{baths}+bath" if q(baths) else "")
-            ])
-        )
-        rf_google = (
-            "https://www.google.com/search?q=" +
-            "+".join([
-                "site:redfin.com",
-                neighborhood.replace(" ", "+"),
-                "condos" if prop_type.lower() == "condo" else prop_type.lower(),
-                f"${min_price}-{max_price}",
-                (f"{beds}+bed" if q(beds) else ""),
-                (f"{baths}+bath" if q(baths) else "")
-            ])
-        )
-        r_base = "https://www.realtor.com/realestateandhomes-search/"
-        r_path = neighborhood.replace(", ", "-").replace(" ", "-")
-        r_type = "condo" if prop_type.lower()=="condo" else "type"
-        r_link = f"{r_base}{r_path}/type-{r_type}"
-
-        st.success("Links ready—click to open in a new tab:")
-        # nice clickable buttons (Streamlit 1.31+)
-        st.link_button("Zillow (direct)", z_base)
-        st.link_button("Zillow (Google filter)", z_google)
-        st.link_button("Redfin (Google filter)", rf_google)
-        st.link_button("Realtor.com (direct-ish)", r_link)
-
-        st.caption("Tip: refine details like DOM, HOA, parking on the portal UI after opening.")
-
-    st.divider()
-    if st.button("⭐ Save as default filters"):
-        st.success("Saved! These values will prefill next time.")
-
-
-# -----------------------------------------------
-# 💬 CHAT INTERFACE
-# -----------------------------------------------
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hi! Share your budget, areas (up to 3), and must-haves — or ask about SF offer strategy."}
-    ]
-
-# Render history
-for m in st.session_state.messages:
-    with st.chat_message(m["role"]):
-        st.markdown(m["content"])
-
-# Input
-user_q = st.chat_input("Type your real-estate question…")
-
-def maybe_add_disclaimer(q: str, reply: str) -> str:
-    ql = q.lower()
-    if any(k in ql for k in ["price", "offer", "negot", "comp", "cma", "dom", "value"]):
-        reply += "\n\n*_Disclaimer: Not legal/financial advice. Verify with your licensed agent and local rules._*"
-    return reply
-
-if user_q:
-    st.session_state.messages.append({"role": "user", "content": user_q})
-    with st.chat_message("user"):
-        st.markdown(user_q)
-
-    # Build system prompt with KB
-    NOTES = load_kb(st.session_state.kb_seed)
-    SYSTEM_PROMPT = SYSTEM_PROMPT_BASE
-    if NOTES:
-        SYSTEM_PROMPT += "\n\nUse these internal notes when helpful:\n" + NOTES
-
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking…"):
-            try:
-                reply = chat(user_q, system_prompt=SYSTEM_PROMPT)
-                reply = maybe_add_disclaimer(user_q, reply)
-            except Exception as e:
-                reply = f"⚠️ Error: {e}"
-            st.markdown(reply)
-
-    st.session_state.messages.append({"role": "assistant", "content": reply})
-
-#----------------------------------------------
-# user sign up  
-#-----------------------------------------------
-from services.auth import create_user  # add with your imports
-
-with st.expander("👤 Create an account (Sign Up)", expanded=True):
-    with st.form("signup_form", clear_on_submit=False):
-        su_name = st.text_input("Full name (optional)")
-        su_email = st.text_input("Email", placeholder="you@example.com")
-        su_pw = st.text_input("Password", type="password")
-        su_pw2 = st.text_input("Confirm password", type="password")
-        su_submit = st.form_submit_button("Create account")
-
-    if su_submit:
-        if not su_email or not su_pw:
-            st.error("Email and password are required.")
-        elif su_pw != su_pw2:
-            st.error("Passwords do not match.")
-        else:
-            res = create_user(email=su_email, password=su_pw, name=su_name or None)
-            if res["ok"]:
-                st.success("Account created! You can log in now.")
-            else:
-                st.error(res["error"] or "Could not create account.")
-#--------------------------------------
-#----user log in
-#--------------------------------------
-with st.expander("🔐 Log in", expanded=True if st.session_state.get("user") is None else False):
-    if st.session_state.get("user"):
-        st.success(f"Logged in as {st.session_state['user']['email']}")
-        if st.button("Log out"):
+with st.container():
+    st.markdown("### 👋 Welcome")
+    if user:
+        st.success(f"Signed in as **{user.get('name') or user['email']}**")
+        c1, c2 = st.columns(2)
+        if c1.button("👤 Profile"):
+            st.session_state["auth_view"] = "profile"
+        if c2.button("Log out"):
             st.session_state["user"] = None
+            st.session_state["auth_view"] = "welcome"
             st.rerun()
     else:
+        st.info("Choose how to continue:")
+        c1, c2, c3 = st.columns(3)
+        if c1.button("🔐 Log in"):
+            st.session_state["auth_view"] = "login"
+            st.rerun()
+        if c2.button("🧭 Continue as visitor"):
+            st.session_state["auth_view"] = "visitor"
+            st.rerun()
+        if c3.button("✨ Sign up"):
+            st.session_state["auth_view"] = "signup"
+            st.rerun()
+
+# ------------------------------
+# Sign Up (only when not logged in)
+# ------------------------------
+if not user and st.session_state["auth_view"] == "signup":
+    with st.expander("👤 Create an account (Sign Up)", expanded=True):
+        with st.form("signup_form", clear_on_submit=False):
+            su_name = st.text_input("Full name (optional)")
+            su_email = st.text_input("Email", placeholder="you@example.com")
+            su_pw = st.text_input("Password", type="password")
+            su_pw2 = st.text_input("Confirm password", type="password")
+            su_submit = st.form_submit_button("Create account")
+        if su_submit:
+            if not su_email or not su_pw:
+                st.error("Email and password are required.")
+            elif su_pw != su_pw2:
+                st.error("Passwords do not match.")
+            else:
+                res = create_user(email=su_email, password=su_pw, name=su_name or None)
+                if res["ok"]:
+                    st.success("Account created! Click **Log in** above.")
+                else:
+                    st.error(res["error"] or "Could not create account.")
+
+# ------------------------------
+# Log In (only when not logged in)
+# ------------------------------
+if not user and st.session_state["auth_view"] == "login":
+    with st.expander("🔐 Log in", expanded=True):
         with st.form("login_form", clear_on_submit=False):
             li_email = st.text_input("Email", placeholder="you@example.com")
             li_pw = st.text_input("Password", type="password")
             li_submit = st.form_submit_button("Log in")
-
         if li_submit:
             res = verify_credentials(li_email, li_pw)
             if res["ok"] and res["user"]:
-                user = res["user"]
-                # store only safe fields in session
-                st.session_state["user"] = {"id": user.id, "email": user.email, "name": user.name}
+                u = res["user"]
+                st.session_state["user"] = {"id": u.id, "email": u.email, "name": u.name}
                 st.success("Logged in successfully.")
+                st.session_state["auth_view"] = "profile"
                 st.rerun()
             else:
                 st.error(res["error"] or "Login failed.")
 
+# ------------------------------
+# Profile (only when logged in)
+# ------------------------------
+if user and st.session_state["auth_view"] == "profile":
+    with st.expander("👤 Profile", expanded=True):
+        st.write(f"**Email:** {user['email']}")
+        st.write(f"**Name:** {user.get('name') or '—'}")
+        st.caption("Profile editing coming next step.")
 
-
-#------------------------------
-#- offer letter generator
-#--------------------------------------
-
+# ------------------------------
+# Offer letter generator (stub) — gated by login
+# ------------------------------
 with st.expander("🧾 Generate Offer Letter (stub)", expanded=True):
     if require_login():
-        st.write("Enter basic details — still offline, no GPT yet.")
+        if not generate_offer_letter_stub:
+            st.warning("Offer generator service not found. Make sure services/offer_generator.py is present.")
+        else:
+            st.write("Enter basic details — still offline, no GPT yet.")
+            with st.form("offer_stub_form", clear_on_submit=False):
+                addr = st.text_input("Property address", "850 Minnesota St #M101, San Francisco, CA")
+                price = st.number_input("Offer price ($)", min_value=500000, max_value=5000000, value=1200000, step=50000)
+                earnest = st.number_input("Earnest money ($)", min_value=1000, max_value=500000, value=int(price * 0.03), step=1000)
+                buyer = st.text_input("Buyer name", "Jane Doe")
+                close_days = st.slider("Closing in (days)", min_value=10, max_value=60, value=30)
+                financing = st.selectbox("Financing type", ["Conventional", "All cash", "FHA", "VA", "Other"])
+                contingencies = st.multiselect(
+                    "Contingencies",
+                    ["Inspection", "Appraisal", "Loan", "Sale of current home"],
+                    default=["Inspection", "Appraisal"],
+                )
+                notes = st.text_area("Additional notes", "We love the light and Dogpatch location.")
+                submitted = st.form_submit_button("Generate letter")
 
-        # 1) Start the form (everything indented under here is part of the form)
-        with st.form("offer_stub_form", clear_on_submit=False):
-            addr = st.text_input("Property address", "850 Minnesota St #M101, San Francisco, CA")
-            price = st.number_input("Offer price ($)", min_value=500000, max_value=5000000, value=1200000, step=50000)
-            earnest = st.number_input("Earnest money ($)", min_value=1000, max_value=500000, value=int(price * 0.03), step=1000)
-            buyer = st.text_input("Buyer name", "Jane Doe")
-            close_days = st.slider("Closing in (days)", min_value=10, max_value=60, value=30)
-            financing = st.selectbox("Financing type", ["Conventional", "All cash", "FHA", "VA", "Other"])
-            contingencies = st.multiselect(
-                "Contingencies",
-                ["Inspection", "Appraisal", "Loan", "Sale of current home"],
-                default=["Inspection", "Appraisal"],
-            )
-            notes = st.text_area("Additional notes", "We love the light and Dogpatch location.")
+            if submitted:
+                inputs = {
+                    "property_address": addr,
+                    "offer_price": price,
+                    "earnest": earnest,
+                    "buyer_name": buyer,
+                    "close_days": close_days,
+                    "financing": financing,
+                    "contingencies": contingencies,
+                    "notes": notes,
+                }
+                letter = generate_offer_letter_stub(inputs)
+                st.code(letter)
+                st.download_button("Download letter (txt)", letter, "offer_letter.txt")
 
-            # 2) Submit button MUST be inside the form block
-            submitted = st.form_submit_button("Generate letter")
-
-        # 3) Handle submit OUTSIDE the form block (one indent less)
-        if submitted:
-            inputs = {
-                "property_address": addr,
-                "offer_price": price,
-                "earnest": earnest,
-                "buyer_name": buyer,
-                "close_days": close_days,
-                "financing": financing,
-                "contingencies": contingencies,
-                "notes": notes,
-            }
-            letter = generate_offer_letter_stub(inputs)
-            st.code(letter)
-            st.download_button("Download letter (txt)", letter, "offer_letter.txt")
-        
-
-
-
-# -----------------------------------------------
-# 🪪 FOOTER
-# -----------------------------------------------
-st.divider()
-st.caption("© 2025 AI Realtor • Demo only. Not legal/financial advice.")
+# ------------------------------
+# (Optional) Search area — keep as-is, or re-hook later
+# ------------------------------
+with st.expander("🔎 Search (placeholder)", expanded=False):
+    if fast_search:
+        st.caption("Your existing search UI can be re-inserted here.")
+        # TODO: re-add your render_filters / results / chat if desired
+    else:
+        st.info("Search client not imported. Skip for now.")

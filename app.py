@@ -200,6 +200,20 @@ if user and st.session_state["auth_view"] == "profile":
 
         contingencies = []
         if want_price == "Yes":
+            st.markdown("**If so, please input/confirm the property address below.**")
+            subject = profile.get("subject_property", {}) or {}
+
+            col1, col2 = st.columns(2)
+            with col1:
+                subject["address1"] = st.text_input("Address line 1", subject.get("address1", ""), key="eval_addr1_inline")
+                subject["prop_city"] = st.text_input("City", subject.get("prop_city", profile.get("city","San Francisco")), key="eval_city_inline")
+            with col2:
+                 subject["address2"] = st.text_input("Address line 2 (unit/suite/floor, optional)", subject.get("address2", ""), key="eval_addr2_inline")
+                 subject["zipcode"] = st.text_input("ZIP code", subject.get("zipcode", ""), key="eval_zip_inline")
+            # save back to session so the payload uses latest edits
+            profile["subject_property"] = subject
+            st.session_state["buyer_profile"] = profile
+            
             contingencies = st.multiselect(
                 "If so, which contingencies might you waive?",
                 ["Inspection", "Appraisal", "Loan", "Sale of current home"],
@@ -286,47 +300,6 @@ else:
     st.info("Log in to view your saved evaluations.")
 
 
-
-# if user and st.session_state["auth_view"] == "profile":
-#     st.markdown("### 🏡 Buyer Profile")
-
-#     # initialize session slot
-#     if "buyer_profile" not in st.session_state:
-#         st.session_state["buyer_profile"] = {
-#             "intent": None,
-#             "budget_min": 800000,
-#             "budget_max": 1200000,
-#             "city": "San Francisco",
-#         }
-
-#     profile = st.session_state["buyer_profile"]
-
-#     # 1️⃣ intent
-#     profile["intent"] = st.radio(
-#         "What brings you here today?",
-#         ["Just exploring the market", "Evaluating a specific property"],
-#         index=0 if not profile["intent"] else
-#         (0 if profile["intent"] == "Just exploring the market" else 1),
-#         horizontal=True,
-#     )
-
-#     # 2️⃣ budget range
-#     profile["budget_min"], profile["budget_max"] = st.slider(
-#         "Budget range ($)", 300000, 5000000,
-#         (profile["budget_min"], profile["budget_max"]),
-#         step=50000,
-#     )
-
-#     # 3️⃣ city / neighborhood
-#     profile["city"] = st.text_input(
-#         "Preferred city or neighborhood",
-#         value=profile.get("city", "San Francisco"),
-#     )
-
-#     # Save in session
-#     st.session_state["buyer_profile"] = profile
-
-#     st.success("Preferences saved in session (not DB yet).")
 
 # ------------------------------
 # Offer letter generator (stub) — gated by login

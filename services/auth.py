@@ -79,15 +79,18 @@ def verify_credentials(email: str, password: str) -> Dict[str, Any]:
         return {"ok": True, "user": user, "error": None}
     return {"ok": False, "user": None, "error": "Incorrect password"}
 
-# get user by id
-def get_user_by_id(user_id:int)->Optional[User]:
-    with _conn()as cx:
-        row=cs.execute("SELECT id, email, name FROM users WHERE id = ?", (user_id,)).fetchone())
+# --- New helper functions for Profile update ---
+def get_user_by_id(user_id: int) -> Optional[User]:
+    """Return user info by id."""
+    with _conn() as cx:
+        row = cx.execute("SELECT id, email, name FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
         return None
-    return User(id=row[0],email=row[1],name=row[2])
-# get user name
+    return User(id=row[0], email=row[1], name=row[2])
+
+
 def update_user_name(user_id: int, name: Optional[str]) -> Dict[str, Any]:
+    """Update the user's name field."""
     try:
         with _conn() as cx:
             cx.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
@@ -95,4 +98,5 @@ def update_user_name(user_id: int, name: Optional[str]) -> Dict[str, Any]:
         return {"ok": True, "error": None}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
 

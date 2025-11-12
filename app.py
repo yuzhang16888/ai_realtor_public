@@ -13,7 +13,7 @@ import streamlit as st
 from gpt_client import chat, SYSTEM_PROMPT_BASE
 from kb import load_notes  # must read all kb/*.md or kb/*.txt
 from services.offer_generator import generate_offer_letter_stub
-
+from services.auth import init_db
 
 
 
@@ -25,6 +25,11 @@ from services.offer_generator import generate_offer_letter_stub
 st.set_page_config(page_title="🏡 AI Realtor", page_icon="🏠", layout="centered")
 st.title("🏡 AI Realtor")
 st.caption("Ask anything about SF home buying. The agent uses your private notes for context. (Demo; not legal/financial advice.)")
+init_db()
+
+# code check
+import os, streamlit as st
+st.caption(f"Auth DB: {os.path.abspath('data/users.db')}")
 
 # -----------------------------------------------
 # 📚 KNOWLEDGE BASE LOADER (with reload)

@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#16a34a"         # Tailwind green-600
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F9FAFB"
+textColor = "#111827"
+font = "sans serif"

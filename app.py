@@ -261,23 +261,28 @@ if user and st.session_state["auth_view"] == "profile":
                 st.error(f"Could not save request: {out['error']}")
 st.divider()
 st.markdown("#### 🗂️ Your Property Evaluations")
-evals = list_property_evals(user_id=user["id"], limit=10)
-if not evals:
-    st.caption("No saved evaluations yet.")
+
+if user:
+    evals = list_property_evals(user_id=user["id"], limit=10)
+    if not evals:
+        st.caption("No saved evaluations yet.")
+    else:
+        for e in evals:
+            with st.container(border=True):
+                st.write(f"**Request #{e['id']}** — status: `{e['status']}` — created: {e['created_at']}")
+                sp_payload = e["payload"].get("subject_property", {})
+                st.write(
+                    f"**Property:** {sp_payload.get('address1','')} {sp_payload.get('address2','')}, "
+                    f"{sp_payload.get('city','')} {sp_payload.get('zipcode','')}"
+                )
+                asks = e["payload"].get("asks", {})
+                if asks.get("want_price"):
+                    st.write(f"• Price suggestion requested — contingencies: {', '.join(asks.get('contingencies', [])) or 'none'}")
+                if asks.get("want_buy_advice"):
+                    st.write(f"• Buy/Not-buy advice — concerns: {asks.get('concerns') or '—'}")
 else:
-    for e in evals:
-        with st.container(border=True):
-            st.write(f"**Request #{e['id']}** — status: `{e['status']}` — created: {e['created_at']}")
-            sp_payload = e["payload"].get("subject_property", {})
-            st.write(
-                f"**Property:** {sp_payload.get('address1','')} {sp_payload.get('address2','')}, "
-                f"{sp_payload.get('city','')} {sp_payload.get('zipcode','')}"
-            )
-            asks = e["payload"].get("asks", {})
-            if asks.get("want_price"):
-                st.write(f"• Price suggestion requested — contingencies: {', '.join(asks.get('contingencies', [])) or 'none'}")
-            if asks.get("want_buy_advice"):
-                st.write(f"• Buy/Not-buy advice — concerns: {asks.get('concerns') or '—'}")
+    st.info("Log in to view your saved evaluations.")
+
 
 
 # if user and st.session_state["auth_view"] == "profile":

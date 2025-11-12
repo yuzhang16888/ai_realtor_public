@@ -155,7 +155,30 @@ if user_q:
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
+####################################
+# user sign in   ###################
+####################################
+from services.auth import create_user  # add with your imports
 
+with st.expander("👤 Create an account (Sign Up)", expanded=True):
+    with st.form("signup_form", clear_on_submit=False):
+        su_name = st.text_input("Full name (optional)")
+        su_email = st.text_input("Email", placeholder="you@example.com")
+        su_pw = st.text_input("Password", type="password")
+        su_pw2 = st.text_input("Confirm password", type="password")
+        su_submit = st.form_submit_button("Create account")
+
+    if su_submit:
+        if not su_email or not su_pw:
+            st.error("Email and password are required.")
+        elif su_pw != su_pw2:
+            st.error("Passwords do not match.")
+        else:
+            res = create_user(email=su_email, password=su_pw, name=su_name or None)
+            if res["ok"]:
+                st.success("Account created! You can log in now.")
+            else:
+                st.error(res["error"] or "Could not create account.")
 
 
 with st.expander("🧾 Generate Offer Letter (stub)", expanded=True):

@@ -48,6 +48,18 @@ from services.evals import (
 # ------------------------------
 st.set_page_config(page_title="AI Realtor", layout="wide")
 st.title("🏠 AI Realtor — Phase 2")
+st.markdown("""
+    <div style="
+        background-color:#f0fdf4;
+        border-radius:12px;
+        padding:10px 0;
+        text-align:center;
+        font-weight:600;
+        color:#15803d;
+        font-size:1.1rem;">
+        🌿 Only pay for what you need.
+    </div>
+""", unsafe_allow_html=True)
 
 # init auth DB
 init_db()

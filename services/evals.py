@@ -124,18 +124,22 @@ def create_property_eval(user_id: int, payload: Dict[str, Any], uploaded_paths: 
     except Exception as e:
         return {"ok": False, "id": None, "error": str(e)}
 
-def list_property_evals(user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
+def list_property_evals(user_id: int, limit: int = 20):
     with _conn() as cx:
         rows = cx.execute(
-            "SELECT id, status, created_at, payload FROM property_evals WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+            "SELECT id, status, created_at, payload, admin_notes, updated_at "
+            "FROM property_evals WHERE user_id = ? ORDER BY id DESC LIMIT ?",
             (user_id, limit),
         ).fetchall()
-    res = []
-    for r in rows:
-        res.append({
+    return [
+        {
             "id": r[0],
             "status": r[1],
             "created_at": r[2],
             "payload": json.loads(r[3]),
-        })
-    return res
+            "admin_notes": r[4] or "",
+            "updated_at": r[5] or "",
+        }
+        for r in rows
+    ]
+

@@ -304,7 +304,7 @@ st.divider()
 st.markdown("#### 🗂️ Your Property Evaluations")
 
 if user:
-    # ✅ manual refresh button
+    # Refresh button
     colr, _ = st.columns([1, 5])
     if colr.button("🔄 Refresh"):
         st.rerun()
@@ -315,11 +315,11 @@ if user:
     else:
         for e in evals:
             with st.container(border=True):
-                # --- status badge + updated time ---
+                # status badge + updated time
                 status_color = {
                     "new": "#f59e0b",         # amber
                     "in_progress": "#3b82f6", # blue
-                    "done": "#16a34a"         # green
+                    "done": "#16a34a",        # green
                 }.get(e["status"], "#6b7280")
 
                 badge = (
@@ -327,14 +327,15 @@ if user:
                     f"color:white;padding:2px 8px;border-radius:999px;"
                     f"font-size:12px;'>{e['status']}</span>"
                 )
+
                 st.markdown(
-                    f"**Request #{e['id']}** — {badge}"
-                    f"&nbsp;&nbsp;<span style='color:#6b7280;'>"
+                    f"**Request #{e['id']}** — {badge} "
+                    f"&nbsp;<span style='color:#6b7280;'>"
                     f"updated: {e.get('updated_at','—')}</span>",
                     unsafe_allow_html=True,
                 )
 
-                # --- property summary ---
+                # property summary
                 sp_payload = e["payload"].get("subject_property", {})
                 st.write(
                     f"**Property:** {sp_payload.get('address1','')} "
@@ -342,7 +343,7 @@ if user:
                     f"{sp_payload.get('city','')} {sp_payload.get('zipcode','')}"
                 )
 
-                # --- what they asked for ---
+                # what they asked for
                 asks = e["payload"].get("asks", {})
                 if asks.get("want_price"):
                     st.write(
@@ -354,8 +355,14 @@ if user:
                         f"• Buy / Not-buy advice — concerns: "
                         f"{asks.get('concerns') or '—'}"
                     )
+
+                # optional: show your notes to user when done
+                if e["status"] == "done" and e.get("admin_notes"):
+                    st.success("Our notes:")
+                    st.write(e["admin_notes"])
 else:
     st.info("Log in to view your saved evaluations.")
+
 
 
 
@@ -403,29 +410,28 @@ with st.expander("🧾 Generate Offer Letter (stub)", expanded=True):
 # ------------------------------
 # Admin Dashboard (private)
 # ------------------------------
-ADMIN_EMAILS = ["yuzhang16888@gmail.com"]  # 👈 replace with your actual login email
+ADMIN_EMAILS = ["youremail@example.com"]  # TODO: put your real admin email here
 
 user = st.session_state.get("user")
 if user and user["email"] in ADMIN_EMAILS:
     st.markdown("## 🧮 Admin Dashboard")
     st.caption("View and manage all property evaluation requests.")
 
-    # Filter by status
     status_filter = st.selectbox(
         "Filter by status", ["All", "new", "in_progress", "done"], index=0
     )
     if status_filter == "All":
-        evals = list_all_property_evals()
+        admin_evals = list_all_property_evals()
     else:
-        evals = list_all_property_evals(status=status_filter)
+        admin_evals = list_all_property_evals(status=status_filter)
 
-    if not evals:
+    if not admin_evals:
         st.info("No evaluation requests yet.")
     else:
-        for e in evals:
+        for e in admin_evals:
             with st.container(border=True):
                 st.markdown(f"**Request #{e['id']}** — user `{e['user_id']}` — status: `{e['status']}`")
-                st.caption(f"Created at: {e['created_at']}")
+                st.caption(f"Created: {e['created_at']}  •  Last updated: {e.get('updated_at', '—')}")
 
                 sp = e["payload"].get("subject_property", {})
                 st.write(
@@ -435,42 +441,46 @@ if user and user["email"] in ADMIN_EMAILS:
 
                 asks = e["payload"].get("asks", {})
                 if asks.get("want_price"):
-                    st.write(f"💰 Price suggestion requested (contingencies: {', '.join(asks.get('contingencies', [])) or 'none'})")
+                    st.write(
+                        f"💰 Price suggestion requested "
+                        f"(contingencies: {', '.join(asks.get('contingencies', [])) or 'none'})"
+                    )
                 if asks.get("want_buy_advice"):
-                    st.write(f"🏡 Buy/Not-buy advice — concerns: {asks.get('concerns') or '—'}")
+                    st.write(
+                        f"🏡 Buy/Not-buy advice — concerns: "
+                        f"{asks.get('concerns') or '—'}"
+                    )
 
-                # --- Editable admin section ---
                 st.divider()
-                new_status = st.selectbox(
-                    f"Update status for request #{e['id']}",
-                    ["new", "in_progress", "done"],
-                    index=["new", "in_progress", "done"].index(e["status"]),
-                    key=f"status_{e['id']}",
-                )
-                notes = st.text_area(
-                    f"Admin notes / reasoning (#{e['id']})",
-                    value=e.get("admin_notes", ""),
-                    key=f"notes_{e['id']}",
-                )
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button(f"💾 Save Notes #{e['id']}", key=f"save_notes_{e['id']}", type="primary"):
-                        res = update_property_eval_notes(e["id"], notes)
-                        if res["ok"]:
-                            st.success("Notes saved.")
-                        else:
-                            st.error(res["error"])
-                with col2:
-                    if st.button(f"🔁 Update Status #{e['id']}", key=f"update_status_{e['id']}", type="secondary"):
-                        res = update_property_eval_status(e["id"], new_status)
-                        if res["ok"]:
-                            st.success("Status updated.")
-                        else:
-                            st.error(res["error"])
+                # ✅ admin controls in a form so updates rerun the page
+                with st.form(f"admin_eval_{e['id']}"):
+                    new_status = st.selectbox(
+                        f"Update status for request #{e['id']}",
+                        ["new", "in_progress", "done"],
+                        index=["new", "in_progress", "done"].index(e["status"]),
+                        key=f"status_{e['id']}",
+                    )
+                    notes = st.text_area(
+                        f"Admin notes / reasoning (#{e['id']})",
+                        value=e.get("admin_notes", ""),
+                        key=f"notes_{e['id']}",
+                    )
+                    c1, c2 = st.columns(2)
+                    save_notes = c1.form_submit_button("💾 Save Notes", type="primary")
+                    save_status = c2.form_submit_button("🔁 Update Status")
+
+                if save_notes:
+                    res = update_property_eval_notes(e["id"], notes)
+                    st.toast("Notes saved ✅" if res["ok"] else f"Error: {res['error']}")
+                    st.rerun()
+
+                if save_status:
+                    res = update_property_eval_status(e["id"], new_status)
+                    st.toast("Status updated ✅" if res["ok"] else f"Error: {res['error']}")
+                    st.rerun()
 else:
     st.caption("🔒 Admin dashboard is visible only to authorized users.")
-
 
 
 

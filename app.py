@@ -297,27 +297,63 @@ if user and st.session_state["auth_view"] == "profile":
                 )
             else:
                 st.error(f"Could not save request: {out['error']}")
+# ------------------------------
+# User view – My evaluation requests
+# ------------------------------
 st.divider()
-st.markdown("#### 🗂️ How much should I offer?")
+st.markdown("#### 🗂️ Your Property Evaluations")
 
 if user:
+    # ✅ manual refresh button
+    colr, _ = st.columns([1, 5])
+    if colr.button("🔄 Refresh"):
+        st.rerun()
+
     evals = list_property_evals(user_id=user["id"], limit=10)
     if not evals:
         st.caption("No saved evaluations yet.")
     else:
         for e in evals:
             with st.container(border=True):
-                st.write(f"**Request #{e['id']}** — status: `{e['status']}` — created: {e['created_at']}")
+                # --- status badge + updated time ---
+                status_color = {
+                    "new": "#f59e0b",         # amber
+                    "in_progress": "#3b82f6", # blue
+                    "done": "#16a34a"         # green
+                }.get(e["status"], "#6b7280")
+
+                badge = (
+                    f"<span style='background:{status_color};"
+                    f"color:white;padding:2px 8px;border-radius:999px;"
+                    f"font-size:12px;'>{e['status']}</span>"
+                )
+                st.markdown(
+                    f"**Request #{e['id']}** — {badge}"
+                    f"&nbsp;&nbsp;<span style='color:#6b7280;'>"
+                    f"updated: {e.get('updated_at','—')}</span>",
+                    unsafe_allow_html=True,
+                )
+
+                # --- property summary ---
                 sp_payload = e["payload"].get("subject_property", {})
                 st.write(
-                    f"**Property:** {sp_payload.get('address1','')} {sp_payload.get('address2','')}, "
+                    f"**Property:** {sp_payload.get('address1','')} "
+                    f"{sp_payload.get('address2','')}, "
                     f"{sp_payload.get('city','')} {sp_payload.get('zipcode','')}"
                 )
+
+                # --- what they asked for ---
                 asks = e["payload"].get("asks", {})
                 if asks.get("want_price"):
-                    st.write(f"• Price suggestion requested — contingencies: {', '.join(asks.get('contingencies', [])) or 'none'}")
+                    st.write(
+                        f"• Price suggestion requested — contingencies: "
+                        f"{', '.join(asks.get('contingencies', [])) or 'none'}"
+                    )
                 if asks.get("want_buy_advice"):
-                    st.write(f"• Buy/Not-buy advice — concerns: {asks.get('concerns') or '—'}")
+                    st.write(
+                        f"• Buy / Not-buy advice — concerns: "
+                        f"{asks.get('concerns') or '—'}"
+                    )
 else:
     st.info("Log in to view your saved evaluations.")
 

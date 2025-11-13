@@ -17,7 +17,7 @@ DB_PATH = DATA_DIR / "users.db"   # reuse same DB file
 #-------------------------
 
 def _column_exists(cx, table: str, col: str) -> bool:
-    rows = ccx.execute(f"PRAGMA table_info({table})").fetchall()
+    rows = cx.execute(f"PRAGMA table_info({table})").fetchall()
     return any(r[1] == col for r in rows)
 
 def migrate_eval_db() -> None:

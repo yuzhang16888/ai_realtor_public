@@ -298,7 +298,7 @@ if user and st.session_state["auth_view"] == "profile":
             else:
                 st.error(f"Could not save request: {out['error']}")
 st.divider()
-st.markdown("#### 🗂️ Your Property Evaluations")
+st.markdown("#### 🗂️ How much should I offer?")
 
 if user:
     evals = list_property_evals(user_id=user["id"], limit=10)

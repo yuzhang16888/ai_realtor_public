@@ -17,14 +17,17 @@ DB_PATH = DATA_DIR / "users.db"   # reuse same DB file
 #-------------------------
 
 def _column_exists(cx, table: str, col: str) -> bool:
-    rows = cx.execute(f"PRAGMA table_info({table})").fetchall()
+    rows = ccx.execute(f"PRAGMA table_info({table})").fetchall()
     return any(r[1] == col for r in rows)
 
 def migrate_eval_db() -> None:
     with _conn() as cx:
         if not _column_exists(cx, "property_evals", "admin_notes"):
             cx.execute("ALTER TABLE property_evals ADD COLUMN admin_notes TEXT")
-            cx.commit()
+        if not _column_exists(cx,"property_evals","update_at"):
+            cx.execute("ALTER TABLE property_evals ADD COLUMN updated_at TEXT")
+        cx.commit
+            
 
 
 def list_all_property_evals(limit: int = 100, status: str | None = None):

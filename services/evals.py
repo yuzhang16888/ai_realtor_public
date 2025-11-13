@@ -12,6 +12,68 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "users.db"   # reuse same DB file
 
+#----------------------
+#admin dash
+#-------------------------
+
+def _column_exists(cx, table: str, col: str) -> bool:
+    rows = cx.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(r[1] == col for r in rows)
+
+def migrate_eval_db() -> None:
+    with _conn() as cx:
+        if not _column_exists(cx, "property_evals", "admin_notes"):
+            cx.execute("ALTER TABLE property_evals ADD COLUMN admin_notes TEXT")
+            cx.commit()
+
+
+def list_all_property_evals(limit: int = 100, status: str | None = None):
+    with _conn() as cx:
+        if status:
+            rows = cx.execute(
+                "SELECT id, user_id, status, created_at, payload, admin_notes "
+                "FROM property_evals WHERE status = ? ORDER BY id DESC LIMIT ?",
+                (status, limit),
+            ).fetchall()
+        else:
+            rows = cx.execute(
+                "SELECT id, user_id, status, created_at, payload, admin_notes "
+                "FROM property_evals ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "user_id": r[1],
+            "status": r[2],
+            "created_at": r[3],
+            "payload": json.loads(r[4]),
+            "admin_notes": r[5] or "",
+        }
+        for r in rows
+    ]
+
+
+def update_property_eval_status(eval_id: int, status: str):
+    try:
+        with _conn() as cx:
+            cx.execute("UPDATE property_evals SET status = ? WHERE id = ?", (status, eval_id))
+            cx.commit()
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def update_property_eval_notes(eval_id: int, notes: str):
+    try:
+        with _conn() as cx:
+            cx.execute("UPDATE property_evals SET admin_notes = ? WHERE id = ?", (notes, eval_id))
+            cx.commit()
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+
 def _conn():
     return sqlite3.connect(DB_PATH)
 
@@ -27,6 +89,9 @@ def init_eval_db() -> None:
             )
         """)
         cx.commit()
+
+migrate_eval_db()
+
 
 def save_uploads(files: List) -> List[str]:
     """Save uploaded files to data/uploads/<uuid>_<orig_name>; return relative paths."""
